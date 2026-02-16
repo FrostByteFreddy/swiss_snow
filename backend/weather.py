@@ -32,7 +32,8 @@ def get_weather_forecast(lat: float, lon: float) -> dict:
             "is_day"
         ]),
         "timezone": "Europe/Zurich",
-        "forecast_days": 2 # Fetch 2 days to ensure we have next 24h from now
+        "forecast_days": 2, # Fetch 2 days to ensure we have next 24h from now
+        "models": "icon_seamless" # Uses high-res Swiss ICON models (1km/2.2km)
     }
 
     try:

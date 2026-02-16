@@ -4,6 +4,7 @@ from geo import get_location_data
 from weather import get_weather_forecast
 from snow_engine import SnowPredictor
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}}) 
@@ -55,8 +56,9 @@ def predict_api():
     hourly = weather_data.get("hourly", {})
     all_times = hourly.get("time", [])
     
-    # Find start index for current hour
-    current_hour_iso = datetime.now().strftime("%Y-%m-%dT%H:00")
+    # Find start index for current hour in Zurich timezone
+    now_zurich = datetime.now(ZoneInfo("Europe/Zurich"))
+    current_hour_iso = now_zurich.strftime("%Y-%m-%dT%H:00")
     start_index = 0
     for idx, t in enumerate(all_times):
         if t >= current_hour_iso:
@@ -76,7 +78,7 @@ def predict_api():
     is_day_list = hourly.get("is_day", [])[start_index:end_index]
 
     hourly_data = []
-    today_day = datetime.now().day
+    today_day = now_zurich.day
     
     for i, time_str in enumerate(times):
         dt = datetime.fromisoformat(time_str)
