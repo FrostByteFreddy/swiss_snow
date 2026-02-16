@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import axios from 'axios';
 import { MapPin, Wind, History, ChevronLeft, ArrowRight, Edit3, Droplets, Thermometer, Mountain } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001').replace(/\/$/, '');
 
 function SnowApp() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -72,7 +72,7 @@ function SnowApp() {
   if (data) {
     const activeHour = data.hourly_data[activeIndex];
     return (
-      <div className="flex h-screen w-full flex-col bg-slate-950 overflow-hidden">
+      <div className="flex h-[100svh] w-full flex-col bg-slate-950 overflow-hidden">
         {/* Horizontal Scroll Section */}
         <section className="flex-1 flex flex-col justify-start overflow-hidden pt-12 pb-4">
           <div className="flex overflow-x-auto gap-6 px-8 pb-12 snap-x scrollbar-hide h-full items-center">
@@ -146,7 +146,7 @@ function SnowApp() {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center bg-slate-950 p-8 pt-20">
+    <div className="flex h-[100svh] w-full flex-col items-center bg-slate-950 p-8 pt-20 overflow-y-auto">
       <header className="mb-16 text-center">
         <h1 className="text-7xl font-black tracking-tighter leading-none mb-4 shadow-sky-500">Swiss<br /><span className="text-sky-400">Snow</span></h1>
         <p className="text-[0.6rem] font-black uppercase tracking-[0.5em] text-slate-600">Atmospheric Data Hub</p>
