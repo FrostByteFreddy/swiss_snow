@@ -25,7 +25,10 @@ def get_weather_forecast(lat: float, lon: float) -> dict:
             "temperature_850hPa",
             "temperature_700hPa",
             "is_day",
-            "surface_pressure"
+            "surface_pressure",
+            "temperature_1000hPa", "temperature_950hPa", "temperature_925hPa", "temperature_900hPa", "temperature_850hPa", "temperature_800hPa", "temperature_700hPa",
+            "relative_humidity_1000hPa", "relative_humidity_950hPa", "relative_humidity_925hPa", "relative_humidity_900hPa", "relative_humidity_850hPa", "relative_humidity_800hPa", "relative_humidity_700hPa",
+            "geopotential_height_1000hPa", "geopotential_height_950hPa", "geopotential_height_925hPa", "geopotential_height_900hPa", "geopotential_height_850hPa", "geopotential_height_800hPa", "geopotential_height_700hPa"
         ]),
         "current": ",".join([
             "temperature_2m",

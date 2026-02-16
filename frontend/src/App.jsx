@@ -5,6 +5,59 @@ import { MapPin, Wind, History, ChevronLeft, ArrowRight, Edit3, Droplets, Thermo
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001').replace(/\/$/, '');
 
+const VerticalProfile = ({ profile }) => {
+  if (!profile || profile.length < 2) return null;
+
+  const minT = Math.min(...profile.map(p => p.temp), 0) - 2;
+  const maxT = Math.max(...profile.map(p => p.temp), 0) + 2;
+  const minZ = profile[0].z;
+  const maxZ = profile[profile.length - 1].z;
+
+  const w = 120;
+  const h = 160;
+  const padding = 10;
+
+  const tToX = (t) => padding + ((t - minT) / (maxT - minT)) * (w - 2 * padding);
+  const zToY = (z) => h - padding - ((z - minZ) / (maxZ - minZ)) * (h - 2 * padding);
+
+  const points = profile.map(p => `${tToX(p.temp)},${zToY(p.z)}`).join(' ');
+  const zeroX = tToX(0);
+
+  return (
+    <div className="flex flex-col items-center bg-black/20 rounded-2xl p-4 border border-white/5 backdrop-blur-sm self-center">
+      <span className="text-[0.5rem] font-black uppercase tracking-widest text-slate-500 mb-2">Atmospheric Profile</span>
+      <svg width={w} height={h} className="overflow-visible">
+        {/* Zero Line */}
+        <line x1={zeroX} y1={padding} x2={zeroX} y2={h - padding} stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="2,2" />
+
+        {/* Levels */}
+        {profile.map((p, i) => (
+          <g key={i}>
+            <circle cx={tToX(p.temp)} cy={zToY(p.z)} r="2" fill={p.temp < 0 ? '#22d3ee' : '#fb7185'} />
+            <text x={tToX(p.temp) + 4} y={zToY(p.z) + 3} fontSize="6" fill="rgba(255,255,255,0.3)" className="font-bold">
+              {Math.round(p.temp)}°
+            </text>
+          </g>
+        ))}
+
+        {/* Trend Line */}
+        <polyline points={points} fill="none" stroke="url(#lineGradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+        <defs>
+          <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fb7185" />
+            <stop offset="100%" stopColor="#22d3ee" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="mt-2 flex justify-between w-full px-2">
+        <span className="text-[0.5rem] font-bold text-cyan-400">-{Math.round(minZ)}m</span>
+        <span className="text-[0.5rem] font-bold text-rose-400">{Math.round(maxZ)}m</span>
+      </div>
+    </div>
+  );
+};
+
 function SnowApp() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -87,9 +140,12 @@ function SnowApp() {
                     <div className="text-6xl drop-shadow-2xl">{hour.icon}</div>
                   </div>
 
-                  <div className="my-8">
-                    <span className="text-8xl font-black tracking-tighter">{Math.round(hour.temp)}°</span>
-                    <div className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-[0.3em]">{hour.type}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="my-8">
+                      <span className="text-8xl font-black tracking-tighter">{Math.round(hour.temp)}°</span>
+                      <div className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-[0.3em]">{hour.type}</div>
+                    </div>
+                    <VerticalProfile profile={hour.profile} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-y-10 gap-x-6">

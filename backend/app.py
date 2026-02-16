@@ -78,6 +78,11 @@ def predict_api():
     is_day_list = hourly.get("is_day", [])[start_index:end_index]
     pressures = hourly.get("surface_pressure", [])[start_index:end_index]
 
+    # Pre-extract multi-level profile data
+    p_levels = [1000, 950, 925, 900, 850, 800, 700]
+    lvl_temps = {p: hourly.get(f"temperature_{p}hPa", [])[start_index:end_index] for p in p_levels}
+    lvl_heights = {p: hourly.get(f"geopotential_height_{p}hPa", [])[start_index:end_index] for p in p_levels}
+
     hourly_data = []
     today_day = now_zurich.day
     
@@ -92,8 +97,20 @@ def predict_api():
         is_day = is_day_list[i] if i < len(is_day_list) else 1
 
         pressure = pressures[i] if i < len(pressures) else 1013.25
+        
+        # Build Profile: Surface + Pressure Levels
+        profile = [{"z": display_elevation, "temp": temp}]
+        for p in p_levels:
+            h = lvl_heights[p][i]
+            t = lvl_temps[p][i]
+            # Only include levels above current elevation to avoid underground "artifacts"
+            if h > display_elevation:
+                profile.append({"z": h, "temp": t})
+        
+        # Sort by height for the engine
+        profile = sorted(profile, key=lambda x: x['z'])
 
-        precip_info = SnowPredictor.determine_precip_type(temp, rh, fl, display_elevation, t850, pressure)
+        precip_info = SnowPredictor.determine_precip_type(temp, rh, fl, display_elevation, t850, pressure, profile)
         
         # Icon Logic
         condition_icon = precip_info['icon']
@@ -115,7 +132,9 @@ def predict_api():
             "fl": int(fl),
             "icon": condition_icon,
             "type": precip_info['type'],
-             "wb_class": "wb-freezing" if precip_info['wet_bulb'] < 0.5 else ("wb-cold" if precip_info['wet_bulb'] < 1.0 else "wb-warm")
+            "wb_class": "wb-freezing" if precip_info['wet_bulb'] < 0.5 else ("wb-cold" if precip_info['wet_bulb'] < 1.0 else "wb-warm"),
+            "profile": profile, # For Frontend Viz
+            "areas": precip_info.get('areas', {"pos": 0, "neg": 0})
         })
 
     return jsonify({
