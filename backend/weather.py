@@ -24,7 +24,8 @@ def get_weather_forecast(lat: float, lon: float) -> dict:
             "freezing_level_height",
             "temperature_850hPa",
             "temperature_700hPa",
-            "is_day"
+            "is_day",
+            "surface_pressure"
         ]),
         "current": ",".join([
             "temperature_2m",

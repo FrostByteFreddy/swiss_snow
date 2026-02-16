@@ -76,6 +76,7 @@ def predict_api():
     temps_850 = hourly.get("temperature_850hPa", [])[start_index:end_index]
     cloud_covers = hourly.get("cloud_cover", [])[start_index:end_index]
     is_day_list = hourly.get("is_day", [])[start_index:end_index]
+    pressures = hourly.get("surface_pressure", [])[start_index:end_index]
 
     hourly_data = []
     today_day = now_zurich.day
@@ -90,7 +91,9 @@ def predict_api():
         cloud_cover = cloud_covers[i] if i < len(cloud_covers) else 0
         is_day = is_day_list[i] if i < len(is_day_list) else 1
 
-        precip_info = SnowPredictor.determine_precip_type(temp, rh, fl, display_elevation, t850)
+        pressure = pressures[i] if i < len(pressures) else 1013.25
+
+        precip_info = SnowPredictor.determine_precip_type(temp, rh, fl, display_elevation, t850, pressure)
         
         # Icon Logic
         condition_icon = precip_info['icon']

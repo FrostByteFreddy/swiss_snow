@@ -2,24 +2,45 @@ import math
 
 class SnowPredictor:
     @staticmethod
-    def calculate_wet_bulb(temp_air: float, relative_humidity: float) -> float:
+    def calculate_wet_bulb(temp_air: float, relative_humidity: float, pressure: float = 1013.25) -> float:
         """
-        Approximates Wet-Bulb Temperature (Tw) using the Stull (2011) formula.
+        Calculates Wet-Bulb Temperature (Tw) using a high-precision iterative 
+        psychrometric method. More accurate than Stull, especially near 0°C.
         
         Args:
             temp_air (float): Air temperature in Celsius.
             relative_humidity (float): Relative humidity in %.
+            pressure (float): Surface pressure in hPa.
             
         Returns:
             float: Wet-bulb temperature in Celsius.
         """
-        T = temp_air
-        RH = relative_humidity
+        if relative_humidity >= 99.9:
+            return temp_air
+            
+        # Saturation vapor pressure at dry bulb (Bolton 1980)
+        es = 6.112 * math.exp(17.67 * temp_air / (temp_air + 243.5))
+        e = es * (relative_humidity / 100.0)
         
-        tw = (T * math.atan(0.151977 * (RH + 8.313659)**0.5) +
-              math.atan(T + RH) - math.atan(RH - 1.676331) +
-              0.00391838 * (RH**1.5) * math.atan(0.023101 * RH) - 4.686035)
+        # Iteratively solve the psychrometric equation:
+        # e = es(Tw) - A * P * (T - Tw)
+        # using the Newton-Raphson method.
+        # A is the psychrometric constant (standard: 0.000661 K^-1)
+        A = 0.000661
+        tw = temp_air
         
+        for _ in range(10):
+            es_tw = 6.112 * math.exp(17.67 * tw / (tw + 243.5))
+            des_dtw = es_tw * 17.67 * 243.5 / (tw + 243.5)**2
+            
+            f = es_tw - A * pressure * (temp_air - tw) - e
+            df = des_dtw + A * pressure
+            
+            tw_new = tw - f / df
+            if abs(tw_new - tw) < 0.001:
+                return tw_new
+            tw = tw_new
+            
         return tw
 
     @staticmethod
@@ -28,7 +49,8 @@ class SnowPredictor:
         rh_surface: float, 
         freezing_level: float, 
         elevation: float,
-        temp_850hpa: float
+        temp_850hpa: float,
+        pressure: float = 1013.25
     ) -> dict:
         """
         Determines the type of precipitation risk based on meteorological parameters.
@@ -41,7 +63,7 @@ class SnowPredictor:
                 "wet_bulb": float
             }
         """
-        wet_bulb = SnowPredictor.calculate_wet_bulb(temp_surface, rh_surface)
+        wet_bulb = SnowPredictor.calculate_wet_bulb(temp_surface, rh_surface, pressure)
         
         # Inversion Check for Freezing Rain
         # If surface is below freezing but air aloft (850hPa ~ 1500m) is warm
