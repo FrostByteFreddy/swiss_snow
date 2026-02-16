@@ -47,40 +47,42 @@ class SnowPredictor:
     def calculate_freezing_level(profile: list, surface_elevation: float) -> float:
         """
         Calculates the 0°C level (isotherm) by interpolating the atmospheric profile.
-        
-        Args:
-            profile (list): Sorted list of dicts with {"z": height_m, "temp": temp_c}
-            surface_elevation (float): Elevation of the station/location.
-            
-        Returns:
-            float: Freezing level height in meters ASL.
+        Finds the HIGHEST crossing point (important for inversion handling).
         """
-        if not profile or len(profile) < 1:
-            return 0.0
-            
-        # Start from surface and look for crossing point
-        for i in range(len(profile) - 1):
-            p1 = profile[i]
-            p2 = profile[i+1]
-            
-            # Check for 0C crossing
-            if (p1['temp'] >= 0 and p2['temp'] <= 0) or (p1['temp'] <= 0 and p2['temp'] >= 0):
-                if p1['temp'] == p2['temp']:
-                    return p1['z']
-                # Linear interpolation
-                fraction = -p1['temp'] / (p2['temp'] - p1['temp'])
-                return round(p1['z'] + fraction * (p2['z'] - p1['z']))
-                
-        # If all points are below freezing, the freezing level is "at or below" surface
-        if all(p['temp'] < 0 for p in profile):
+        if not profile or len(profile) < 2:
             return surface_elevation
             
-        # If all points are above freezing, FL is above the highest point 
-        # (We could extrapolate, but for now we'll return the top level + a guess)
-        if all(p['temp'] > 0 for p in profile):
-             return profile[-1]['z'] + 500 # Approximation
+        # Search from TOP down to find the highest crossing
+        reversed_profile = profile[::-1]
+        for i in range(len(reversed_profile) - 1):
+            p_top = reversed_profile[i]
+            p_bot = reversed_profile[i+1]
+            
+            # Crossing 0C
+            if (p_top['temp'] <= 0 and p_bot['temp'] >= 0) or (p_top['temp'] >= 0 and p_bot['temp'] <= 0):
+                if p_top['temp'] == p_bot['temp']:
+                    return p_top['z']
+                # Linear interpolation: z = z1 + (target - t1) * (z2 - z1) / (t2 - t1)
+                fraction = (-p_top['temp']) / (p_bot['temp'] - p_top['temp'])
+                return round(p_top['z'] + fraction * (p_bot['z'] - p_top['z']))
+                
+        # Handle cases with NO crossing (entirely cold or entirely warm)
+        
+        # 1. Entirely Cold: Extrapolate downward from surface
+        # Uses a standard lapse rate (-6.5C / km) to find a representative FL below surface
+        if all(p['temp'] <= 0 for p in profile):
+             surf = profile[0]
+             if surf['temp'] == 0: return surf['z']
+             # z = z_surf - (temp_surf / lapse_rate)
+             # lapse_rate = -0.0065 C/m
+             return round(surf['z'] - (surf['temp'] / -0.0065))
              
-        return 0.0
+        # 2. Entirely Warm: Fl is likely above top of profile
+        if all(p['temp'] >= 0 for p in profile):
+             top = profile[-1]
+             return round(top['z'] + (top['temp'] / 0.0065))
+             
+        return surface_elevation
 
     @staticmethod
     def calculate_bourgouin_areas(profile: list) -> dict:

@@ -98,21 +98,27 @@ def predict_api():
 
         pressure = pressures[i] if i < len(pressures) else 1013.25
         
-        # Build Profile: Surface + Pressure Levels
+        # Build Profile: Surface + Pressure Levels with deduplication
         profile = [{"z": display_elevation, "temp": temp}]
-        for p in p_levels:
-            h = lvl_heights[p][i]
-            t = lvl_temps[p][i]
-            # Only include levels significantly above current elevation to avoid overlapping dots/underground data
-            if h > display_elevation + 30:
-                profile.append({"z": h, "temp": t})
         
-        # Sort by height for the engine
-        profile = sorted(profile, key=lambda x: x['z'])
-
+        # Sort aloft levels first
+        aloft_raw = []
+        for p in p_levels:
+            aloft_raw.append({"z": lvl_heights[p][i], "temp": lvl_temps[p][i]})
+        aloft_sorted = sorted(aloft_raw, key=lambda x: x['z'])
+        
+        for point in aloft_sorted:
+            last = profile[-1]
+            # Skip if below or too close to surface
+            if point['z'] < display_elevation + 30:
+                continue
+            # Skip if redundant with last added point (Close in height AND temperature)
+            if (point['z'] - last['z'] < 50) and (abs(point['temp'] - last['temp']) < 0.3):
+                continue
+            profile.append(point)
+        
         # Dynamic Freezing Level Calculation (Isotherm)
-        dynamic_fl = SnowPredictor.calculate_freezing_level(profile, display_elevation)
-        fl = dynamic_fl if dynamic_fl > 0 else fl # Use dynamic if found, else fallback
+        fl = SnowPredictor.calculate_freezing_level(profile, display_elevation)
 
         precip_info = SnowPredictor.determine_precip_type(temp, rh, fl, display_elevation, t850, pressure, profile)
         

@@ -49,5 +49,40 @@ def test_bourgouin():
     )
     print(f"Rain Profile: {res_rain['type']} (Areas: {res_rain['areas']})")
 
+def test_freezing_level():
+    print("\n--- Testing Freezing Level refinements ---")
+    
+    # 1. Inversion Case: Highest isotherm should be picked
+    # Crossing between 1000/1200 and again at 2000/2200
+    profile_inv = [
+        {"z": 500,  "temp": -2.0}, # Surface
+        {"z": 1000, "temp": -1.0},
+        {"z": 1200, "temp": 2.0},  # Crossing 1
+        {"z": 1500, "temp": 3.0},
+        {"z": 2000, "temp": 1.0},
+        {"z": 2200, "temp": -1.0}  # Crossing 2 (HIGHEST)
+    ]
+    fl_inv = SnowPredictor.calculate_freezing_level(profile_inv, 500)
+    print(f"Inversion FL (expected ~2100): {fl_inv}")
+
+    # 2. Entirely Cold: Downward extrapolation
+    profile_cold = [
+        {"z": 500,  "temp": -2.0},
+        {"z": 1000, "temp": -5.0},
+        {"z": 2000, "temp": -12.0}
+    ]
+    fl_cold = SnowPredictor.calculate_freezing_level(profile_cold, 500)
+    # Using lapse rate -0.0065 C/m: 500 - (-2 / -0.0065) = 500 - 307 = 193
+    print(f"Entirely Cold FL (expected ~192): {fl_cold}")
+
+    # 3. Surface at 0C
+    profile_zero = [
+        {"z": 500, "temp": 0.0},
+        {"z": 1000, "temp": -3.0}
+    ]
+    fl_zero = SnowPredictor.calculate_freezing_level(profile_zero, 500)
+    print(f"Surface at 0C FL (expected 500): {fl_zero}")
+
 if __name__ == "__main__":
     test_bourgouin()
+    test_freezing_level()
