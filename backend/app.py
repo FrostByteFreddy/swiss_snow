@@ -6,7 +6,7 @@ from snow_engine import SnowPredictor
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app) # Enable CORS for Vite dev server
+CORS(app, resources={r"/api/*": {"origins": "*"}}) 
 
 @app.route("/api/predict", methods=["POST"])
 def predict_api():
