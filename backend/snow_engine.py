@@ -44,6 +44,45 @@ class SnowPredictor:
         return tw
 
     @staticmethod
+    def calculate_freezing_level(profile: list, surface_elevation: float) -> float:
+        """
+        Calculates the 0°C level (isotherm) by interpolating the atmospheric profile.
+        
+        Args:
+            profile (list): Sorted list of dicts with {"z": height_m, "temp": temp_c}
+            surface_elevation (float): Elevation of the station/location.
+            
+        Returns:
+            float: Freezing level height in meters ASL.
+        """
+        if not profile or len(profile) < 1:
+            return 0.0
+            
+        # Start from surface and look for crossing point
+        for i in range(len(profile) - 1):
+            p1 = profile[i]
+            p2 = profile[i+1]
+            
+            # Check for 0C crossing
+            if (p1['temp'] >= 0 and p2['temp'] <= 0) or (p1['temp'] <= 0 and p2['temp'] >= 0):
+                if p1['temp'] == p2['temp']:
+                    return p1['z']
+                # Linear interpolation
+                fraction = -p1['temp'] / (p2['temp'] - p1['temp'])
+                return round(p1['z'] + fraction * (p2['z'] - p1['z']))
+                
+        # If all points are below freezing, the freezing level is "at or below" surface
+        if all(p['temp'] < 0 for p in profile):
+            return surface_elevation
+            
+        # If all points are above freezing, FL is above the highest point 
+        # (We could extrapolate, but for now we'll return the top level + a guess)
+        if all(p['temp'] > 0 for p in profile):
+             return profile[-1]['z'] + 500 # Approximation
+             
+        return 0.0
+
+    @staticmethod
     def calculate_bourgouin_areas(profile: list) -> dict:
         """
         Calculates Positive (Melting) and Negative (Refreezing) areas in the 

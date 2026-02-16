@@ -103,12 +103,16 @@ def predict_api():
         for p in p_levels:
             h = lvl_heights[p][i]
             t = lvl_temps[p][i]
-            # Only include levels above current elevation to avoid underground "artifacts"
-            if h > display_elevation:
+            # Only include levels significantly above current elevation to avoid overlapping dots/underground data
+            if h > display_elevation + 30:
                 profile.append({"z": h, "temp": t})
         
         # Sort by height for the engine
         profile = sorted(profile, key=lambda x: x['z'])
+
+        # Dynamic Freezing Level Calculation (Isotherm)
+        dynamic_fl = SnowPredictor.calculate_freezing_level(profile, display_elevation)
+        fl = dynamic_fl if dynamic_fl > 0 else fl # Use dynamic if found, else fallback
 
         precip_info = SnowPredictor.determine_precip_type(temp, rh, fl, display_elevation, t850, pressure, profile)
         
