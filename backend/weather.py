@@ -26,9 +26,9 @@ def get_weather_forecast(lat: float, lon: float) -> dict:
             "temperature_700hPa",
             "is_day",
             "surface_pressure",
-            "temperature_1000hPa", "temperature_950hPa", "temperature_925hPa", "temperature_900hPa", "temperature_850hPa", "temperature_800hPa", "temperature_700hPa",
-            "relative_humidity_1000hPa", "relative_humidity_950hPa", "relative_humidity_925hPa", "relative_humidity_900hPa", "relative_humidity_850hPa", "relative_humidity_800hPa", "relative_humidity_700hPa",
-            "geopotential_height_1000hPa", "geopotential_height_950hPa", "geopotential_height_925hPa", "geopotential_height_900hPa", "geopotential_height_850hPa", "geopotential_height_800hPa", "geopotential_height_700hPa"
+            "temperature_1000hPa", "temperature_975hPa", "temperature_950hPa", "temperature_925hPa", "temperature_900hPa", "temperature_875hPa", "temperature_850hPa", "temperature_825hPa", "temperature_800hPa", "temperature_775hPa", "temperature_750hPa", "temperature_700hPa", "temperature_650hPa", "temperature_600hPa", "temperature_550hPa", "temperature_500hPa",
+            "relative_humidity_1000hPa", "relative_humidity_975hPa", "relative_humidity_950hPa", "relative_humidity_925hPa", "relative_humidity_900hPa", "relative_humidity_875hPa", "relative_humidity_850hPa", "relative_humidity_825hPa", "relative_humidity_800hPa", "relative_humidity_775hPa", "relative_humidity_750hPa", "relative_humidity_700hPa", "relative_humidity_650hPa", "relative_humidity_600hPa", "relative_humidity_550hPa", "relative_humidity_500hPa",
+            "geopotential_height_1000hPa", "geopotential_height_975hPa", "geopotential_height_950hPa", "geopotential_height_925hPa", "geopotential_height_900hPa", "geopotential_height_875hPa", "geopotential_height_850hPa", "geopotential_height_825hPa", "geopotential_height_800hPa", "geopotential_height_775hPa", "geopotential_height_750hPa", "geopotential_height_700hPa", "geopotential_height_650hPa", "geopotential_height_600hPa", "geopotential_height_550hPa", "geopotential_height_500hPa"
         ]),
         "current": ",".join([
             "temperature_2m",

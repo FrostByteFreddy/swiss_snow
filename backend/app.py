@@ -79,7 +79,7 @@ def predict_api():
     pressures = hourly.get("surface_pressure", [])[start_index:end_index]
 
     # Pre-extract multi-level profile data
-    p_levels = [1000, 950, 925, 900, 850, 800, 700]
+    p_levels = [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 650, 600, 550, 500]
     lvl_temps = {p: hourly.get(f"temperature_{p}hPa", [])[start_index:end_index] for p in p_levels}
     lvl_heights = {p: hourly.get(f"geopotential_height_{p}hPa", [])[start_index:end_index] for p in p_levels}
 
@@ -98,40 +98,74 @@ def predict_api():
 
         pressure = pressures[i] if i < len(pressures) else 1013.25
         
-        # Build Profile: Surface + Pressure Levels with deduplication
-        profile = [{"z": display_elevation, "temp": temp}]
+        # Build Profile: Surface + Pressure Levels
+        # key change: We do NOT filter below surface for visualization
+        raw_points = [{"z": display_elevation, "temp": temp, "type": "SFC"}]
         
-        # Sort aloft levels first
-        aloft_raw = []
         for p in p_levels:
-            aloft_raw.append({"z": lvl_heights[p][i], "temp": lvl_temps[p][i]})
-        aloft_sorted = sorted(aloft_raw, key=lambda x: x['z'])
+            z_h = lvl_heights[p][i]
+            if z_h is not None:
+                raw_points.append({"z": z_h, "temp": lvl_temps[p][i], "type": f"{p}hPa"})
         
-        for point in aloft_sorted:
-            last = profile[-1]
-            # Skip if below or too close to surface
-            if point['z'] < display_elevation + 30:
-                continue
-            # Skip if redundant with last added point (Close in height AND temperature)
-            if (point['z'] - last['z'] < 50) and (abs(point['temp'] - last['temp']) < 0.3):
-                continue
-            profile.append(point)
+        # Sort by altitude
+        profile = sorted(raw_points, key=lambda x: x['z'])
         
+        # Deduplication (only if VERY close, e.g. < 5m) to avoid glitches
+        clean_profile = []
+        if profile:
+            clean_profile.append(profile[0])
+            for point in profile[1:]:
+                last = clean_profile[-1]
+                if (point['z'] - last['z'] > 5): 
+                    clean_profile.append(point)
+        
+        profile = clean_profile
+
         # Dynamic Freezing Level Calculation (Isotherm)
         fl = SnowPredictor.calculate_freezing_level(profile, display_elevation)
 
         precip_info = SnowPredictor.determine_precip_type(temp, rh, fl, display_elevation, t850, pressure, profile)
         
-        # Icon Logic
+        # Icon & Type Logic
         condition_icon = precip_info['icon']
+        weather_type = precip_info['type']
+        
         if precip == 0:
-            if cloud_cover > 50:
-                condition_icon = "☁️" 
+            if cloud_cover > 75:
+                condition_icon = "☁️"
+                weather_type = "Cloudy"
+            elif cloud_cover > 25:
+                condition_icon = "⛅"
+                weather_type = "Partly Cloudy"
             else:
                 condition_icon = "☀️" if is_day else "🌙"
+                weather_type = "Clear"
         
         day_label = "Today" if dt.day == today_day else "Tomorrow"
         
+        # Build Visualization Data (Backend Logic for Frontend)
+        viz_profile = []
+        for p in profile:
+            z_rel = int(p['z'] - display_elevation)
+            
+            # Filter for relevant range (Widened for dynamic frontend scaling)
+            # We keep a large buffer (-1000 to +4000) to ensure we catch high FLs/SFGs
+            if z_rel < -1000 or z_rel > 4000:
+                continue
+
+            sign = "+" if z_rel > 0 else ""
+            label = f"{int(p['z'])}m ({sign}{z_rel}m)"
+            if p.get('type') == 'SFC':
+                label = "Surface (0m)"
+            
+            viz_profile.append({
+                "z": p['z'],
+                "temp": p['temp'],
+                "z_rel": z_rel,
+                "label": label,
+                "type": p.get('type', '')
+            })
+
         hourly_data.append({
             "time": dt.strftime("%H:%M"),
             "day": day_label,
@@ -141,9 +175,14 @@ def predict_api():
             "precip": precip if precip > 0 else 0,
             "fl": int(fl),
             "icon": condition_icon,
-            "type": precip_info['type'],
+            "type": weather_type,
             "wb_class": "wb-freezing" if precip_info['wet_bulb'] < 0.5 else ("wb-cold" if precip_info['wet_bulb'] < 1.0 else "wb-warm"),
-            "profile": profile, # For Frontend Viz
+            "profile": profile, 
+            "viz": { 
+                "profile": viz_profile,
+                "elevation": int(display_elevation), # User Elevation for ASL labels
+                "sfg": int(fl - 300) if fl else None # Snowfall Limit (approx 300m below FL)
+            }, 
             "areas": precip_info.get('areas', {"pos": 0, "neg": 0})
         })
 

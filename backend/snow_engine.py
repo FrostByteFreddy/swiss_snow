@@ -166,7 +166,16 @@ class SnowPredictor:
 
         # Bourgouin Analysis if profile available
         if profile:
-            areas = SnowPredictor.calculate_bourgouin_areas(profile)
+            # FILTER PROFILE: Only consider layers ABOVE the user's elevation.
+            # Precip falling at the user's location is only affected by the air above.
+            # 1. Filter points above elevation
+            # 2. Add the user's current conditions as the "Surface" point
+            relevant_profile = [p for p in profile if p['z'] > elevation]
+            
+            # Insert User Surface Point
+            relevant_profile.insert(0, {"z": elevation, "temp": temp_surface})
+            
+            areas = SnowPredictor.calculate_bourgouin_areas(relevant_profile)
             result["areas"] = {"pos": areas['positive'], "neg": areas['negative']}
             
             pos = areas['positive']
@@ -191,7 +200,6 @@ class SnowPredictor:
                 elif temp_surface < 0:
                     result["type"] = "Freezing Rain"
                     result["icon"] = "⚠️"
-                    result["risk_level"] = "High"
                 elif pos < 300:
                     result["type"] = "Mix"
                     result["icon"] = "🌨️"
