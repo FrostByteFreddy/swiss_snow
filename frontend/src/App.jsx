@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { MapPin, Wind, History, ArrowRight, Edit3 } from 'lucide-react';
@@ -15,7 +15,8 @@ function SnowApp() {
     return saved ? JSON.parse(saved) : [];
   });
   const [error, setError] = useState(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeHourIndex, setActiveHourIndex] = useState(0);
+  const scrollContainerRef = useRef(null);
 
   const locationParam = searchParams.get('location');
   const elevationParam = searchParams.get('elevation');
@@ -56,6 +57,15 @@ function SnowApp() {
     }
   };
 
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      const scrollLeft = scrollContainerRef.current.scrollLeft;
+      const width = scrollContainerRef.current.clientWidth;
+      const index = Math.round(scrollLeft / width);
+      setActiveHourIndex(index);
+    }
+  };
+
   const [formLocation, setFormLocation] = useState(locationParam || '');
   const [formElevation, setFormElevation] = useState(elevationParam || '');
 
@@ -71,35 +81,51 @@ function SnowApp() {
   }
 
   if (data) {
-    const activeHour = data.hourly_data[activeIndex];
-    return (
-      <div className="flex min-h-screen w-full flex-col bg-slate-950 overflow-x-hidden">
-        {/* Horizontal Scroll Section */}
-        <section className="flex-1 flex flex-col justify-start pt-12 pb-4">
-          <div className="flex overflow-x-auto gap-6 px-8 pb-12 snap-x scrollbar-hide items-start">
-            {data.hourly_data.map((hour, i) => (
-              <WeatherCard key={i} hour={hour} />
-            ))}
-          </div>
-        </section>
+    // Generate Timeline labels (Every 3 hours or so to avoid clutter)
+    const totalHours = data.hourly_data.length;
+    const progress = (activeHourIndex / (totalHours - 1)) * 100;
 
-        {/* Location Edit Footer */}
-        <footer className="w-full max-w-lg mx-auto p-8 pb-10 bg-slate-900/40 backdrop-blur-3xl border-t border-white/5 shrink-0 flex items-center justify-between rounded-t-[4rem] shadow-[0_-20px_60px_rgba(0,0,0,0.6)]">
-          <div className="flex flex-col">
-            <span className="text-[0.6rem] font-black uppercase tracking-[0.3em] text-slate-600 mb-1">Atmospheric Node</span>
-            <div className="flex items-center gap-3">
-              <span className="text-xl font-black tracking-tighter truncate max-w-[240px] uppercase">{data.location.display_name.split(',')[0]}</span>
-              <div className="h-1.5 w-1.5 rounded-full bg-sky-500/50"></div>
-              <span className="text-[0.7rem] font-black text-sky-400 uppercase tracking-widest">{data.elevation}m</span>
-            </div>
+    return (
+      <div className="flex h-[100svh] w-full flex-col bg-slate-950 overflow-hidden relative">
+
+        {/* Fixed Top Bar / Timeline */}
+        <div className="absolute top-0 left-0 w-full z-50 pt-8 pb-4 px-6 bg-gradient-to-b from-slate-950 to-transparent">
+          {/* Header Info */}
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => setSearchParams({})}
+              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <Edit3 size={14} />
+              <span className="text-[0.6rem] font-black uppercase tracking-widest">{data.location.display_name.split(',')[0]}</span>
+            </button>
+            <span className="text-[0.6rem] font-black uppercase tracking-widest text-sky-500">{data.elevation}m</span>
           </div>
-          <button
-            onClick={() => setSearchParams({})}
-            className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all shadow-xl active:scale-95 group"
-          >
-            <Edit3 size={22} className="text-slate-400 group-hover:text-white transition-colors" strokeWidth={1.5} />
-          </button>
-        </footer>
+
+          {/* Timeline Progress Bar */}
+          <div className="relative w-full h-1 bg-white/10 rounded-full mb-2">
+            <div
+              className="absolute top-0 left-0 h-full bg-sky-500 rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(14,165,233,0.5)]"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="flex justify-between text-[0.5rem] font-black uppercase tracking-widest text-slate-500">
+            <span>Now</span>
+            <span>+12h</span>
+            <span>+24h</span>
+          </div>
+        </div>
+
+        {/* Full Screen Scroll Container */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-x-auto snap-x snap-mandatory flex scrollbar-hide w-full h-full"
+        >
+          {data.hourly_data.map((hour, i) => (
+            <WeatherCard key={i} hour={hour} />
+          ))}
+        </div>
       </div>
     );
   }
