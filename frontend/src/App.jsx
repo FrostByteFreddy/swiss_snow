@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { MapPin, Wind, History, ArrowRight, Edit3 } from 'lucide-react';
+import WeatherBackground from './components/WeatherBackground';
 import WeatherCard from './components/WeatherCard';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001').replace(/\/$/, '');
@@ -61,7 +62,8 @@ function SnowApp() {
     if (scrollContainerRef.current) {
       const scrollLeft = scrollContainerRef.current.scrollLeft;
       const width = scrollContainerRef.current.clientWidth;
-      const index = Math.round(scrollLeft / width);
+      // Use fractional index instead of rounding
+      const index = scrollLeft / width;
       setActiveHourIndex(index);
     }
   };
@@ -85,8 +87,30 @@ function SnowApp() {
     const totalHours = data.hourly_data.length;
     const progress = (activeHourIndex / (totalHours - 1)) * 100;
 
+    // Get integer index for data access
+    const currentIndex = Math.floor(activeHourIndex);
+    const nextIndex = Math.min(currentIndex + 1, totalHours - 1);
+
+    const currentHourData = data.hourly_data[currentIndex] || data.hourly_data[0];
+    const nextHourData = data.hourly_data[nextIndex] || currentHourData;
+
+    // Calculate continuous hour for smooth transitions
+    const parseHour = (t) => parseInt(t.split(':')[0], 10);
+    const currentH = parseHour(currentHourData.time);
+    let nextH = parseHour(nextHourData.time);
+    if (nextH < currentH) nextH += 24; // Handle midnight crossing
+
+    const fraction = activeHourIndex - currentIndex;
+    const continuousHour = currentH + (nextH - currentH) * fraction;
+
     return (
       <div className="flex h-[100svh] w-full flex-col bg-slate-950 overflow-hidden relative">
+        {/* Global Weather Background (Transitions based on active slide) */}
+        <WeatherBackground
+          type={currentHourData.type}
+          activeHour={continuousHour} // Pass the calculated float hour
+          precip={currentHourData.precip}
+        />
 
         {/* Fixed Top Bar / Timeline */}
         <div className="absolute top-0 left-0 w-full z-50 pt-8 pb-4 px-6 bg-gradient-to-b from-slate-950 to-transparent">
