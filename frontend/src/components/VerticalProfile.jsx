@@ -194,8 +194,15 @@ const VerticalProfile = ({ viz }) => {
             </div>
 
             {/* Legend */}
-            <div className="w-full mt-2 border-t border-white/5 pt-2 ml-2 mb-12">
-                <div className="flex flex-col items-center space-y-1 mb-3">
+            <div className="w-full mt-2 border-t border-white/5 pt-2 ml-2 mb-12 relative">
+                {/* X-Axis Labels */}
+                <div className="absolute top-[-10px] left-[30px] right-[30px] flex justify-between text-[0.4rem] font-bold text-slate-500">
+                    <span>{Math.round(minT)}°C</span>
+                    <span>{Math.round((minT + maxT) / 2)}°C</span>
+                    <span>{Math.round(maxT)}°C</span>
+                </div>
+
+                <div className="flex flex-col items-center space-y-1 mt-4 mb-3">
                     <div className="flex items-center space-x-4 text-[0.6rem] font-bold">
                         <div className="flex items-center space-x-1">
                             <div className="w-3 h-1 bg-[#f43f5e]"></div>

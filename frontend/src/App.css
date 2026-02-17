@@ -111,10 +111,11 @@
   background: white;
   border-radius: 50%;
   opacity: 0.8;
-  filter: blur(1px);
+  /* filter: blur(1px); removed for performance */
   animation-name: snowfall;
   animation-iteration-count: infinite;
   animation-timing-function: linear;
+  will-change: transform;
 }
 
 .raindrop {
@@ -126,15 +127,17 @@
   animation-name: rainfall;
   animation-iteration-count: infinite;
   animation-timing-function: linear;
+  will-change: transform;
 }
 
 .cloud-particle {
   position: absolute;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
   border-radius: 50%;
-  filter: blur(20px);
+  /* filter: blur(20px); removed for performance, radial gradient is enough */
   animation-iteration-count: infinite;
   animation-timing-function: linear;
+  will-change: transform;
 }
 
 /* Scrollbar Hiding */
