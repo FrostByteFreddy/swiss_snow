@@ -41,16 +41,9 @@ def predict_api():
     base_elevation = weather_data.get('elevation', 0)
     display_elevation = manual_elevation if manual_elevation is not None else base_elevation
 
-    if manual_elevation is not None:
-        diff_m = manual_elevation - base_elevation
-        temp_adjustment = (diff_m / 100.0) * -0.65
-        
-        if "current" in weather_data:
-            weather_data["current"]["temperature_2m"] = round(weather_data["current"]["temperature_2m"] + temp_adjustment, 1)
-        
-        if "hourly" in weather_data:
-            hourly_temps = weather_data["hourly"].get("temperature_2m", [])
-            weather_data["hourly"]["temperature_2m"] = [round(t + temp_adjustment, 1) for t in hourly_temps]
+    # 3. Process Data & Apply Manual Elevation logic handled dynamically in loop
+    base_elevation = weather_data.get('elevation', 0)
+    display_elevation = manual_elevation if manual_elevation is not None else base_elevation
 
     # Hourly data processing
     hourly = weather_data.get("hourly", {})
@@ -82,6 +75,7 @@ def predict_api():
     p_levels = [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 650, 600, 550, 500]
     lvl_temps = {p: hourly.get(f"temperature_{p}hPa", [])[start_index:end_index] for p in p_levels}
     lvl_heights = {p: hourly.get(f"geopotential_height_{p}hPa", [])[start_index:end_index] for p in p_levels}
+    lvl_rhs = {p: hourly.get(f"relative_humidity_{p}hPa", [])[start_index:end_index] for p in p_levels}
 
     hourly_data = []
     today_day = now_zurich.day
@@ -98,14 +92,60 @@ def predict_api():
 
         pressure = pressures[i] if i < len(pressures) else 1013.25
         
-        # Build Profile: Surface + Pressure Levels
-        # key change: We do NOT filter below surface for visualization
-        raw_points = [{"z": display_elevation, "temp": temp, "type": "SFC"}]
-        
+        # Build Upper Air Profile (Pressure Levels)
+        upper_air_points = []
         for p in p_levels:
             z_h = lvl_heights[p][i]
             if z_h is not None:
-                raw_points.append({"z": z_h, "temp": lvl_temps[p][i], "type": f"{p}hPa"})
+                upper_air_points.append({
+                    "z": z_h, 
+                    "temp": lvl_temps[p][i], 
+                    "rh": lvl_rhs[p][i] if lvl_rhs.get(p) else 80, # Fallback RH
+                    "type": f"{p}hPa"
+                })
+        
+        # Sort by altitude
+        upper_profile = sorted(upper_air_points, key=lambda x: x['z'])
+
+        # Determine User Conditions (Temp/RH)
+        # If Manual Elevation: Interpolate from Upper Profile
+        # If Auto Elevation: Use Modeled Surface Data (temps[i], rhs[i])
+        
+        user_temp = temps[i]
+        user_rh = rhs[i]
+
+        if manual_elevation is not None:
+            # Interpolation Logic
+            # Find neighbors
+            p_below = None
+            p_above = None
+            
+            for p in upper_profile:
+                if p['z'] <= display_elevation:
+                    p_below = p
+                elif p['z'] > display_elevation:
+                    p_above = p
+                    break
+            
+            if p_below and p_above:
+                # Linear Interpolation
+                fraction = (display_elevation - p_below['z']) / (p_above['z'] - p_below['z'])
+                user_temp = p_below['temp'] + fraction * (p_above['temp'] - p_below['temp'])
+                user_rh = p_below['rh'] + fraction * (p_above['rh'] - p_below['rh'])
+            elif p_above and not p_below:
+                # We are below the lowest pressure level -> Extrapolate or use lowest
+                # Often standard lapse rate is safer for boundary layer below lowest data
+                # But here we just use the lowest point to avoid crazy extrapolation
+                user_temp = p_above['temp'] + (display_elevation - p_above['z']) * -0.0065
+                user_rh = p_above['rh']
+            elif p_below and not p_above:
+                # We are above the highest pressure level -> Extrapolate using standard atmosphere
+                user_temp = p_below['temp'] + (display_elevation - p_below['z']) * -0.0065
+                user_rh = p_below['rh']
+
+        # Construct Final Profile for Calculation
+        # Always inject the user "Surface" point
+        raw_points = [{"z": display_elevation, "temp": user_temp, "type": "SFC"}] + upper_air_points
         
         # Sort by altitude
         profile = sorted(raw_points, key=lambda x: x['z'])
@@ -120,6 +160,10 @@ def predict_api():
                     clean_profile.append(point)
         
         profile = clean_profile
+
+        # Override temp/rh variables for downstream use (precip calc, etc)
+        temp = user_temp
+        rh = user_rh
 
         # Dynamic Freezing Level Calculation (Isotherm)
         fl = SnowPredictor.calculate_freezing_level(profile, display_elevation)
