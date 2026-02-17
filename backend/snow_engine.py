@@ -87,21 +87,31 @@ class SnowPredictor:
     @staticmethod
     def calculate_bourgouin_areas(profile: list) -> dict:
         """
-        Calculates Positive (Melting) and Negative (Refreezing) areas in the 
-        atmospheric column using the Bourgouin (2000) method logic.
-        
-        Args:
-            profile (list): List of dicts with {"z": height_m, "temp": temp_c}
-            
-        Returns:
-            dict: {"positive": float, "negative": float, "layers": list}
+        Calculates Positive (Melting) and Negative (Refreezing) areas.
+        CRITICAL FIX: Only counts Negative Area that occurs BELOW the highest melting layer.
+        The cold upper atmosphere (snow source) should NOT count as refreezing energy.
         """
         if not profile or len(profile) < 2:
-            return {"positive": 0, "negative": 0, "layers": []}
+            return {"positive": 0, "negative": 0}
             
-        # Ensure profile is sorted by height
+        # Ensure profile is sorted by height (Surface -> Top)
         sorted_profile = sorted(profile, key=lambda x: x['z'])
         
+        # 1. Identify the highest point where T > 0 (Top of the melting layer)
+        # If the entire profile is < 0, then melting energy is 0.
+        highest_warm_z = -9999
+        has_warm_layer = False
+        
+        for p in sorted_profile:
+            if p['temp'] > 0:
+                has_warm_layer = True
+                if p['z'] > highest_warm_z:
+                    highest_warm_z = p['z']
+                    
+        if not has_warm_layer:
+            # All cold -> Pure Snow
+            return {"positive": 0, "negative": 0}
+
         pos_area = 0.0
         neg_area = 0.0
         
@@ -115,27 +125,47 @@ class SnowPredictor:
             t1 = p1['temp']
             t2 = p2['temp']
             
-            # Simple trapezoidal integration for area
-            # A = (T1 + T2) / 2 * dz
-            # But we need to handle crossing the 0C line
-            if t1 >= 0 and t2 >= 0:
-                pos_area += (t1 + t2) / 2.0 * dz
-            elif t1 <= 0 and t2 <= 0:
-                neg_area += abs((t1 + t2) / 2.0 * dz)
-            else:
-                # Crosses 0 line. Find the crossover point z_cross
-                # T(z) = T1 + (T2-T1)/(z2-z1) * (z-z1) = 0
-                # z_cross = z1 - T1 * (z2-z1) / (T2-T1)
+            # Area Calculation
+            # We split the segment if it crosses 0°C to be precise
+            
+            # Check if this segment interacts with our layers of interest
+            # For POSITIVE area: Count ALL warm area (Melting energy)
+            # For NEGATIVE area: Count only if we are BELOW the highest_warm_z (Refreezing energy)
+            
+            # Simple average temp for the layer
+            avg_t = (t1 + t2) / 2.0
+            
+            # CROSSING CASE: The segment spans 0°C
+            if (t1 > 0 and t2 < 0) or (t1 < 0 and t2 > 0):
                 fraction = abs(t1) / (abs(t1) + abs(t2))
                 dz_1 = dz * fraction
                 dz_2 = dz - dz_1
                 
-                if t1 > 0:
-                    pos_area += (t1 / 2.0) * dz_1
-                    neg_area += abs(t2 / 2.0) * dz_2
+                # Part 1 (Triangle starting at t1, ending at 0)
+                # Area = 0.5 * base * height = 0.5 * dz_1 * t1
+                if t1 > 0: 
+                    pos_area += 0.5 * t1 * dz_1
                 else:
-                    neg_area += abs(t1 / 2.0) * dz_1
-                    pos_area += (t2 / 2.0) * dz_2
+                    # Only count neg if below highest warm z
+                    if p1['z'] < highest_warm_z:
+                        neg_area += 0.5 * abs(t1) * dz_1
+                        
+                # Part 2 (Triangle starting at 0, ending at t2)
+                # Area = 0.5 * base * height = 0.5 * dz_2 * t2
+                if t2 > 0:
+                    pos_area += 0.5 * t2 * dz_2
+                else:
+                    if p2['z'] < highest_warm_z:
+                         neg_area += 0.5 * abs(t2) * dz_2
+
+            # NON-CROSSING: Entirely Warm or Entirely Cold
+            # Trapezoidal Rule: Area = avg_height * width
+            elif t1 >= 0 and t2 >= 0:
+                pos_area += avg_t * dz
+            else:
+                # Entirely Cold
+                if p2['z'] <= highest_warm_z: 
+                    neg_area += abs(avg_t) * dz
                     
         return {"positive": round(pos_area, 1), "negative": round(neg_area, 1)}
 
@@ -152,6 +182,11 @@ class SnowPredictor:
         """
         Determines the type of precipitation risk based on meteorological parameters.
         Uses Bourgouin method if vertical profile is available.
+        
+        Note: The area thresholds used here (positive/negative energy) are calculated 
+        in [m·°C] as a proxy for the original Bourgouin [J/kg]. This is a standard 
+        simplification that assumes constant specific heat and density for the relevant 
+        atmospheric layers.
         """
         wet_bulb = SnowPredictor.calculate_wet_bulb(temp_surface, rh_surface, pressure)
         
